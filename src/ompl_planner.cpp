@@ -1,5 +1,6 @@
-#define raggio 0.19
+#define raggio 0.15
 #define OMPL_time 5.0
+#define numeroTentativi 4
 
 #include <pluginlib/class_list_macros.h>
 #include "ompl_planner.h"
@@ -34,6 +35,9 @@
 #include "geometry_msgs/Quaternion.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "geometry_msgs/Point.h"
+
+#define MAX(X,Y) ((X) < (Y) ? (Y) : (X))
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
  //register this planner as a BaseGlobalPlanner plugin
  PLUGINLIB_EXPORT_CLASS(ompl_planner::OMPLPlanner, nav_core::BaseGlobalPlanner)
@@ -227,7 +231,7 @@ ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPt
     return ob::OptimizationObjectivePtr(new ob::PathLengthOptimizationObjective(si));
 }
 
-void plann()
+void plann(double xx,double yy,double yaww,double time)
 {
 
     // construct the state space we are planning in
@@ -239,10 +243,10 @@ void plann()
     bounds.setHigh(0,offsetX);
     bounds.setLow(1,-offsetY);
     bounds.setHigh(1,offsetY);*/
-    bounds.setLow(0,0.25);
-    bounds.setHigh(0,1.2);
-    bounds.setLow(1,-2.35);
-    bounds.setHigh(1,2.75);
+    bounds.setLow(0,MIN(startX,xx)-(0.22*2));
+    bounds.setHigh(0,MAX(startX,xx)+(0.22*2));
+    bounds.setLow(1,MIN(startY,yy)-(0.22*2));
+    bounds.setHigh(1,MAX(startY,yy)+(0.22*2));
 
     space->setBounds(bounds);
 
@@ -289,9 +293,9 @@ void plann()
     /*(*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[0] = 0.71;
     (*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[1] = 2.0;
     (*goal)[1]->as<ob::SO2StateSpace::StateType>()->value = 0.0;*/
-    (*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[0] = 0.65;
-    (*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[1] = 1.18;
-    (*goal)[1]->as<ob::SO2StateSpace::StateType>()->value = 0.0;
+    (*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[0] = xx;
+    (*goal)[0]->as<ob::RealVectorStateSpace::StateType>()->values[1] = yy;
+    (*goal)[1]->as<ob::SO2StateSpace::StateType>()->value = yaww;
 
 
 
@@ -329,7 +333,7 @@ void plann()
     pdef->print(std::cout);
 
     // attempt to solve the problem within ten seconds of planning time
-    ob::PlannerStatus solved = planner->ob::Planner::solve(OMPL_time);
+    ob::PlannerStatus solved = planner->ob::Planner::solve(time);
 
     ob::PathPtr pathh;
 pathLength=-1;
@@ -465,19 +469,27 @@ ROS_INFO("2: offsetX: %f\noffsetY: %f\nresolution: %f\nwidth: %d\nheight: %d",of
 
 
 
-
+    double time=OMPL_time;
+    int attempts=0;
 
     do{
-        plann();
-    }while (pathLength==-1 && solvedOnce==false);
+        plann(goal.pose.position.x,goal.pose.position.y,tf::getYaw(goal.pose.orientation),time);
+        time++;
+        attempts++;
+    }while (pathLength==-1 && solvedOnce==false && attempts<numeroTentativi);
 
+ if(attempts==numeroTentativi && pathLength==-1)
+ {
+     plan.push_back(goal);
+     return true;
+ }
 if(pathLength!=-1)
 {
     plan.push_back(start);
     for(int i=1;i<pathLength;i++)
     {
-        geometry_msgs::PoseStamped new_goal = goal;
-     tf::Quaternion goal_quat = tf::createQuaternionFromYaw(3.14/2.0);
+      geometry_msgs::PoseStamped new_goal = goal;
+      tf::Quaternion goal_quat = tf::createQuaternionFromYaw(3.14/2.0);
 	
       new_goal.pose.position.x = pathX[i];
       new_goal.pose.position.y = pathY[i];
