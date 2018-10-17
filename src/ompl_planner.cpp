@@ -472,6 +472,28 @@ ROS_INFO("2: offsetX: %f\noffsetY: %f\nresolution: %f\nwidth: %d\nheight: %d",of
     double time=OMPL_time;
     int attempts=0;
 
+	if(solvedOnce==true)
+	{
+        plan.push_back(start);
+
+            for(int i=1;i<pathLength;i++)
+	    {
+	      geometry_msgs::PoseStamped new_goal = goal;
+              tf::Quaternion goal_quat = tf::createQuaternionFromYaw(tf::getYaw(goal.pose.orientation));
+	
+	      new_goal.pose.position.x = pathX[i];
+	      new_goal.pose.position.y = pathY[i];
+
+	      new_goal.pose.orientation.x = goal_quat.x();
+	      new_goal.pose.orientation.y = goal_quat.y();
+	      new_goal.pose.orientation.z = goal_quat.z();
+	      new_goal.pose.orientation.w = goal_quat.w();
+
+	   plan.push_back(new_goal);
+	}
+	return true;
+	}
+
     do{
         plann(goal.pose.position.x,goal.pose.position.y,tf::getYaw(goal.pose.orientation),time);
         time++;
@@ -489,7 +511,7 @@ if(pathLength!=-1)
     for(int i=1;i<pathLength;i++)
     {
       geometry_msgs::PoseStamped new_goal = goal;
-      tf::Quaternion goal_quat = tf::createQuaternionFromYaw(3.14/2.0);
+      tf::Quaternion goal_quat = tf::createQuaternionFromYaw(tf::getYaw(goal.pose.orientation));
 	
       new_goal.pose.position.x = pathX[i];
       new_goal.pose.position.y = pathY[i];
